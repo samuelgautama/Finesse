@@ -200,7 +200,7 @@ for epoch in range(epochs):
 
 # %% 6. Model Export and Preprocessor
 # Define the directory
-save_dir = PROJECT_ROOT / "saved_models"
+save_dir = PROJECT_ROOT / "Deep_Learning" / "saved_models"
 
 # Create the directory if it doesn't exist
 save_dir.mkdir(parents=True, exist_ok=True)
