@@ -90,24 +90,23 @@ class PredictionRequest(BaseModel):
         json_schema_extra = {
             "example": {
                 "features": {
-                    "amount": 50000,
-                    "monthly_budget": 3000000,
-                    "cumulative_spend": 1500000,
-                    "transaction_to_budget_ratio": 0.016,
-                    "budget_utilization_ratio": 0.5,
-                    "user_avg_transaction": 45000,
-                    "amount_vs_user_avg": 1.1,
-                    "is_subscription": False,
-                    "day_of_week": 3,
-                    "is_weekend": 0,
-                    "is_month_end": 0,
-                    "category_Hiburan & Nongkrong": 0,
-                    "category_Makan & Minum": 1,
-                    "category_Transportasi": 0,
-                    "category_Kebutuhan Kuliah": 0,
-                    "category_Tagihan & Kos": 0,
-                    "payment_method_E-Wallet": 1,
-                    "payment_method_Credit Card": 0
+                    "amount": 100000, # pengeluaran terbaru
+                    "monthly_budget": 3000000, # anggaran bulanan
+                    "cumulative_spend": 3500000, # total pengeluaran bulan ini sebelum transaksi terbaru
+                    "transaction_to_budget_ratio": 0.033, # amount / monthly_budget
+                    "budget_utilization_ratio": 1.17, # cumulative_spend / monthly_budget
+                    "user_avg_transaction": 50000, # rata-rata transaksi pengguna
+                    "amount_vs_user_avg": 2.0, # amount / user_avg_transaction
+                    "day_of_week": 6, # 0=Senin, 1=Selasa, ..., 6=Minggu
+                    "is_weekend": 1, # 1 jika day_of_week adalah 5 (Sabtu) atau 6 (Minggu), selain itu 0
+                    "is_month_end": 0, # 1 jika transaksi terjadi pada 3 hari terakhir bulan, selain itu 0
+                    "category_Hiburan & Nongkrong": 1, # fitur one-hot encoding untuk kategori transaksi
+                    "category_Makan & Minum": 0, # fitur one-hot encoding untuk kategori transaksi
+                    "category_Transportasi": 0, # fitur one-hot encoding untuk kategori transaksi
+                    "category_Kebutuhan Kuliah": 0, # fitur one-hot encoding untuk kategori transaksi
+                    "category_Tagihan & Kos": 0, # fitur one-hot encoding untuk kategori transaksi
+                    "payment_method_E-Wallet": 1, # fitur one-hot encoding untuk metode pembayaran
+                    "payment_method_Credit Card": 0 # fitur one-hot encoding untuk metode pembayaran
                 }
             }
         }
@@ -135,16 +134,32 @@ async def predict_financial_health(request: PredictionRequest):
         final_score = round(float(true_prediction[0][0]), 2)
         
         # --- B. Generative AI Phase (Content Synthesis) ---
+        
+        # 1. Mengekstrak Kategori Aktif dari One-Hot Encoding
+        kategori_aktif = "Lainnya"
+        for key, value in request.features.items():
+            if key.startswith("category_") and value == 1:
+                kategori_aktif = key.replace("category_", "")
+                break
+            
+        # 2. Menerjemahkan Boolean/Integer Waktu menjadi teks yang mudah dipahami AI
+        status_weekend = "Ya" if request.features.get('is_weekend', 0) == 1 else "Tidak"
+        status_akhir_bulan = "Ya" if request.features.get('is_month_end', 0) == 1 else "Tidak"
+        
+        # 3. Merakit Prompt dengan Konteks Penuh
         prompt = f"""
         Kamu adalah Finesse, seorang penasihat keuangan pribadi AI yang ramah, ringkas, dan memotivasi. 
         Seorang pengguna baru saja melakukan transaksi dengan detail berikut:
-        - Jumlah Transaksi: Rp {request.features.get('amount', 0)}
+        - Kategori Pengeluaran: {kategori_aktif}
+        - Jumlah Transaksi Saat Ini: Rp {request.features.get('amount', 0)}
+        - Rata-rata Pengeluaran Biasanya: Rp {request.features.get('user_avg_transaction', 0)}
         - Anggaran Bulanan: Rp {request.features.get('monthly_budget', 0)}
         - Total Pengeluaran Bulan Ini: Rp {request.features.get('cumulative_spend', 0)}
+        - Konteks Waktu: Akhir Pekan? {status_weekend} | Akhir Bulan? {status_akhir_bulan}
         
         Setelah transaksi ini, AI Deep Learning kami memberikan 'Financial Health Score' sebesar {final_score}/100.
         
-        Berdasarkan data tersebut, berikan saran singkat (maksimal 5 kalimat) tentang kesehatan finansial mereka dan apa yang harus dilakukan selanjutnya. Gunakan gaya bahasa kasual.
+        Berdasarkan data tersebut, berikan saran singkat (maksimal 5 kalimat) tentang kesehatan finansial mereka dan apa yang harus dilakukan selanjutnya. Perhatikan kategori transaksi, perbandingan jumlah dengan rata-rata, dan konteks waktu untuk memberikan analisis perilaku yang relevan. Gunakan gaya bahasa kasual.
         """
         
         try:
