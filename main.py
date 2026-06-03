@@ -1,4 +1,4 @@
-# Import Libraries
+# %% Import Libraries
 import os
 import pandas as pd
 import numpy as np
@@ -17,7 +17,7 @@ import uvicorn
 from dotenv import load_dotenv
 from google import genai
 
-# 1. Generative AI Configuration
+# %% 1. Generative AI Configuration
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
@@ -27,8 +27,9 @@ if not GEMINI_API_KEY:
 # Initialize GenAI Client
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# 2. Redefine Custom Layer for Model Loading
+# %% 2. Redefine Custom Layer for Model Loading
 class FinesseDenseLayer(tf.keras.layers.Layer):
+    """Implementing standard dense layer (W * x + b) manually."""
     def __init__(self, units=32, activation='relu', **kwargs):
         super(FinesseDenseLayer, self).__init__(**kwargs)
         self.units = units
@@ -47,145 +48,239 @@ class FinesseDenseLayer(tf.keras.layers.Layer):
     def call(self, inputs):
         return self.activation(tf.matmul(inputs, self.w) + self.b)
 
-# 3. App Initialization & Model Loading
+# %% 3. App Initialization & Model Loading
 app = FastAPI(
     title="Finesse AI API",
-    description="Self-contained API for predicting Financial Health Score using a custom DNN model and providing AI-generated financial advice.",
-    version="1.0.0"
+    description="Unified API for Gamified EXP Prediction (DNN), League Profiling (K-Means), and Context-Aware AI Advisor.",
+    version="2.5.0" 
 )
 
-model = None
+# Global Variables
+model_dnn = None
 preprocessor_dnn = None
 target_scaler = None
 
-# Determine Project Root
+scaler_km = None
+kmeans_model = None
+league_mapping = {}
+missions_mapping = {}
+
 try:
     PROJECT_ROOT = Path(__file__).resolve().parent
 except NameError:
     PROJECT_ROOT = Path.cwd()
 
 try:
-    print("\nSearching for and loading DL model and preprocessor...")
+    print("\n⏳ Memuat seluruh arsitektur Machine Learning & Deep Learning...")
     
-    model_path = PROJECT_ROOT / 'saved_models' / 'Deep_Learning' / 'finesse_dnn_v1.keras'
-    prep_path = PROJECT_ROOT / 'saved_models' / 'Deep_Learning' /  'preprocessor_dnn.pkl'
-    scaler_path = PROJECT_ROOT / 'saved_models' / 'Deep_Learning' / 'target_scaler.pkl'
-    
-    model = tf.keras.models.load_model(
-        model_path, 
+    # DL Paths
+    dnn_dir = PROJECT_ROOT / 'saved_models' / 'Deep_Learning'
+    model_dnn = tf.keras.models.load_model(
+        dnn_dir / 'finesse_dnn_v1.keras', 
         custom_objects={'FinesseDenseLayer': FinesseDenseLayer}
     )
-    preprocessor_dnn = joblib.load(prep_path)
-    target_scaler = joblib.load(scaler_path)
+    preprocessor_dnn = joblib.load(dnn_dir / 'preprocessor_dnn.pkl')
+    target_scaler = joblib.load(dnn_dir / 'target_scaler.pkl')
     
-    print("Deep Learning model and preprocessor loaded successfully!\n")
+    # ML Paths
+    km_dir = PROJECT_ROOT / 'saved_models' / 'Machine_Learning'
+    scaler_km = joblib.load(km_dir / 'scaler_finesse.pkl')
+    kmeans_model = joblib.load(km_dir / 'kmeans_finesse.pkl')
+    mappings = joblib.load(km_dir / 'league_mapping.pkl')
+    
+    league_mapping = mappings['leagues']
+    missions_mapping = mappings['missions']
+    
+    print("✅ Seluruh model (DNN & K-Means) siap melayani request!\n")
 except Exception as e:
-    print(f"\nFailed to load model: {e}")
+    print(f"\n❌ GAGAL MEMUAT MODEL: {e}")
 
-# 4. Input Schema Validation
-class PredictionRequest(BaseModel):
+# %% 4. Input Schemas (Validasi Data & Template Swagger)
+class UnifiedRequest(BaseModel):
+    """Skema utama yang menggabungkan seluruh fitur yang dibutuhkan DNN dan K-Means"""
     features: Dict[str, Any]
 
     class Config:
         json_schema_extra = {
             "example": {
                 "features": {
-                    "amount": 100000, # pengeluaran terbaru
-                    "monthly_budget": 3000000, # anggaran bulanan
-                    "cumulative_spend": 3500000, # total pengeluaran bulan ini sebelum transaksi terbaru
-                    "transaction_to_budget_ratio": 0.033, # amount / monthly_budget
-                    "budget_utilization_ratio": 1.17, # cumulative_spend / monthly_budget
-                    "user_avg_transaction": 50000, # rata-rata transaksi pengguna
-                    "amount_vs_user_avg": 2.0, # amount / user_avg_transaction
-                    "day_of_week": 6, # 0=Senin, 1=Selasa, ..., 6=Minggu
-                    "is_weekend": 1, # 1 jika day_of_week adalah 5 (Sabtu) atau 6 (Minggu), selain itu 0
-                    "is_month_end": 0, # 1 jika transaksi terjadi pada 3 hari terakhir bulan, selain itu 0
-                    "category_Hiburan & Nongkrong": 1, # fitur one-hot encoding untuk kategori transaksi
-                    "category_Makan & Minum": 0, # fitur one-hot encoding untuk kategori transaksi
-                    "category_Transportasi": 0, # fitur one-hot encoding untuk kategori transaksi
-                    "category_Kebutuhan Kuliah": 0, # fitur one-hot encoding untuk kategori transaksi
-                    "category_Tagihan & Kos": 0, # fitur one-hot encoding untuk kategori transaksi
-                    "payment_method_E-Wallet": 1, # fitur one-hot encoding untuk metode pembayaran
-                    "payment_method_Credit Card": 0 # fitur one-hot encoding untuk metode pembayaran
+                    "amount": 50000,
+                    "monthly_budget": 3000000,
+                    "cumulative_spend": 1500000,
+                    "transaction_count": 28,
+                    "transaction_to_budget_ratio": 0.016,
+                    "budget_utilization_ratio": 0.5,
+                    "user_avg_transaction": 45000,
+                    "amount_vs_user_avg": 1.1,
+                    "day_of_week": 3,
+                    "is_weekend": 0,
+                    "is_month_end": 0,
+                    "category_Hiburan & Nongkrong": 0,
+                    "category_Makan & Minum": 1,
+                    "category_Transportasi": 0,
+                    "category_Kebutuhan Kuliah": 0,
+                    "category_Tagihan & Kos": 0,
+                    "payment_method_E-Wallet": 1,
+                    "payment_method_Credit Card": 0
                 }
             }
         }
 
-# 5. Prediction Endpoint & GenAI Integration
-@app.post("/predict")
-async def predict_financial_health(request: PredictionRequest):
-    if preprocessor_dnn is None or model is None or target_scaler is None:
-        raise HTTPException(status_code=500, detail="DL model or preprocessor not loaded.")
+class GamificationOnlyRequest(BaseModel):
+    """Skema ringan khusus untuk update leaderboard"""
+    total_spent: float
+    transaction_count: int
+    monthly_budget: float
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "total_spent": 1500000.0,
+                "transaction_count": 28,
+                "monthly_budget": 3000000.0
+            }
+        }
+
+# %% 5. ENDPOINT UTAMA: Dashboard Analysis (All-in-One)
+@app.post("/dashboard-analyze")
+async def analyze_dashboard(request: UnifiedRequest):
+    if any(m is None for m in [model_dnn, preprocessor_dnn, target_scaler, scaler_km, kmeans_model]):
+        raise HTTPException(status_code=500, detail="Sistem AI belum siap.")
 
     try:
-        # --- A. Deep Learning Phase (Prediction) ---
-        df_input = pd.DataFrame([request.features])
+        features_dict = request.features
         
-        for col in df_input.columns:
-            if df_input[col].dtype == 'bool':
-                df_input[col] = df_input[col].astype(int)
+        # --- A. GAMIFICATION PHASE (K-Means League Placement) ---
+        total_spent = features_dict.get('cumulative_spend', 0)
+        trx_count = features_dict.get('transaction_count', 1) 
+        monthly_budget = features_dict.get('monthly_budget', 1) 
+        
+        # Proteksi: Mencegah pembagian dengan nol
+        if monthly_budget <= 0:
+            monthly_budget = 1 
+            
+        budget_utilization = total_spent / monthly_budget
+        
+        km_features = pd.DataFrame({
+            'total_spent': [total_spent],
+            'transaction_count': [trx_count],
+            'budget_utilization': [budget_utilization]
+        })
+        
+        km_scaled = scaler_km.transform(km_features)
+        cluster_id = kmeans_model.predict(km_scaled)[0]
+        
+        user_league = league_mapping.get(cluster_id, "Unranked")
+        user_mission = missions_mapping.get(cluster_id, "Catat transaksimu dengan baik!")
+
+        # --- B. DEEP LEARNING PHASE (DNN EXP Prediction) ---
+        df_input_dnn = pd.DataFrame([features_dict])
+        for col in df_input_dnn.columns:
+            if df_input_dnn[col].dtype == 'bool':
+                df_input_dnn[col] = df_input_dnn[col].astype(int)
                 
-        X_processed = preprocessor_dnn.transform(df_input)
+        X_processed = preprocessor_dnn.transform(df_input_dnn)
         if hasattr(X_processed, "toarray"):
             X_processed = X_processed.toarray()
             
-        scaled_prediction = model.predict(X_processed, verbose=0)
+        scaled_prediction = model_dnn.predict(X_processed, verbose=0)
         true_prediction = target_scaler.inverse_transform(scaled_prediction)
-        final_score = round(float(true_prediction[0][0]), 2)
         
-        # --- B. Generative AI Phase (Content Synthesis) ---
-        
-        # 1. Mengekstrak Kategori Aktif dari One-Hot Encoding
+        # KONVERSI KE EXP: Membulatkan hasil ke bilangan bulat murni (Integer)
+        exp_earned = int(round(float(true_prediction[0][0]), 0))
+
+        # --- C. GENERATIVE AI PHASE ---
         kategori_aktif = "Lainnya"
-        for key, value in request.features.items():
+        for key, value in features_dict.items():
             if key.startswith("category_") and value == 1:
                 kategori_aktif = key.replace("category_", "")
                 break
-            
-        # 2. Menerjemahkan Boolean/Integer Waktu menjadi teks yang mudah dipahami AI
-        status_weekend = "Ya" if request.features.get('is_weekend', 0) == 1 else "Tidak"
-        status_akhir_bulan = "Ya" if request.features.get('is_month_end', 0) == 1 else "Tidak"
-        
-        # 3. Merakit Prompt dengan Konteks Penuh
+                
+        status_weekend = "Ya" if features_dict.get('is_weekend', 0) == 1 else "Tidak"
+        status_akhir_bulan = "Ya" if features_dict.get('is_month_end', 0) == 1 else "Tidak"
+
+        # PROMPT TERBARU SESUAI KONSEP EXP
         prompt = f"""
-        Kamu adalah Finesse, seorang penasihat keuangan pribadi AI yang ramah, ringkas, dan memotivasi. 
-        Seorang pengguna baru saja melakukan transaksi dengan detail berikut:
-        - Kategori Pengeluaran: {kategori_aktif}
-        - Jumlah Transaksi Saat Ini: Rp {request.features.get('amount', 0)}
-        - Rata-rata Pengeluaran Biasanya: Rp {request.features.get('user_avg_transaction', 0)}
-        - Anggaran Bulanan: Rp {request.features.get('monthly_budget', 0)}
-        - Total Pengeluaran Bulan Ini: Rp {request.features.get('cumulative_spend', 0)}
-        - Konteks Waktu: Akhir Pekan? {status_weekend} | Akhir Bulan? {status_akhir_bulan}
+        Kamu adalah Finesse, penasihat keuangan pribadi AI yang ramah dan memotivasi. 
+        Data pengguna saat ini:
+        - Kategori Transaksi Terakhir: {kategori_aktif}
+        - Nominal Transaksi: Rp {features_dict.get('amount', 0)}
+        - Rata-rata Biasa: Rp {features_dict.get('user_avg_transaction', 0)}
+        - Anggaran Bulanan: Rp {monthly_budget}
+        - Konteks: Akhir Pekan? {status_weekend} | Akhir Bulan? {status_akhir_bulan}
         
-        Setelah transaksi ini, AI Deep Learning kami memberikan 'Financial Health Score' sebesar {final_score}/100.
+        Analisis Sistem Internal Finesse:
+        - EXP yang Didapat dari Transaksi Ini: +{exp_earned} EXP
+        - Liga Saat Ini: {user_league}
+        - Misi Aktif: "{user_mission}"
         
-        Berdasarkan data tersebut, berikan saran singkat (maksimal 5 kalimat) tentang kesehatan finansial mereka dan apa yang harus dilakukan selanjutnya. Perhatikan kategori transaksi, perbandingan jumlah dengan rata-rata, dan konteks waktu untuk memberikan analisis perilaku yang relevan. Gunakan gaya bahasa kasual.
+        Berikan saran (maksimal 5 kalimat) yang menyoroti perolehan EXP mereka, mengomentari transaksi terakhir berdasarkan konteks (kategori/waktu), dan SEMANGATI mereka untuk terus menyelesaikan Misi Aktif di Liga {user_league}. Gaya bahasa kasual anak muda.
         """
         
         try:
-            # Execution of GenAI content generation
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=prompt
             )
             ai_advice = response.text
-        except Exception as e_genai:
-            ai_advice = "Skor berhasil diprediksi, namun AI Advisor sedang sibuk. Tetap bijak dalam mengatur keuanganmu!"
-            print(f"Error GenAI: {e_genai}")
+        except Exception:
+            ai_advice = f"Selamat, kamu dapat +{exp_earned} EXP! Terus berjuang selesaikan misimu di Liga {user_league} ya!"
 
-        # --- C. Return Results ---
+        # --- D. RETURN RESPONSE ---
         return {
             "status": "success",
-            "financial_health_score": final_score,
-            "ai_advisor_message": ai_advice
+            "endpoint": "dashboard-analyze",
+            "data": {
+                "exp_earned": exp_earned,
+                "gamification": {
+                    "league": user_league,
+                    "mission": user_mission,
+                    "budget_utilization_percentage": round(budget_utilization * 100, 1)
+                },
+                "ai_advisor_message": ai_advice
+            }
         }
-        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error occured while processing request: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
+# %% 6. ENDPOINT SEKUNDER: Gamification Only
+@app.post("/gamification-only")
+async def analyze_gamification(request: GamificationOnlyRequest):
+    if any(m is None for m in [scaler_km, kmeans_model]):
+        raise HTTPException(status_code=500, detail="Model Gamifikasi belum dimuat.")
+
+    try:
+        if request.monthly_budget <= 0:
+            raise HTTPException(status_code=400, detail="monthly_budget tidak boleh 0 atau minus.")
+            
+        budget_utilization = request.total_spent / request.monthly_budget
+        km_features = pd.DataFrame({
+            'total_spent': [request.total_spent],
+            'transaction_count': [request.transaction_count],
+            'budget_utilization': [budget_utilization]
+        })
+        
+        km_scaled = scaler_km.transform(km_features)
+        cluster_id = kmeans_model.predict(km_scaled)[0]
+        
+        return {
+            "status": "success",
+            "endpoint": "gamification-only",
+            "data": {
+                "league": league_mapping.get(cluster_id, "Unranked"),
+                "mission": missions_mapping.get(cluster_id, "Catat transaksimu!"),
+                "budget_utilization_percentage": round(budget_utilization * 100, 1)
+            }
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# %% 7. Health Check
 @app.get("/test")
 async def test_endpoint():
-    return {"message": "Test endpoint is working!"}
+    return {"message": "API Server Berjalan Normal!"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

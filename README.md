@@ -1,7 +1,7 @@
 # Finesse: Gamified Budgeting & Financial Health Scorer
 > **Backend Repository: Machine Learning & Generative AI**
 
-Repositori ini secara khusus memuat arsitektur backend Machine Learning untuk aplikasi Finesse. Sistem ini bertugas memproses data transaksi pengguna, memberikan metrik evaluasi berupa *Financial Health Score*, dan mensintesis saran keuangan menggunakan Generative AI. 
+Repositori ini memuat arsitektur backend Machine Learning untuk aplikasi Finesse. Sistem ini bertugas memproses data transaksi pengguna menggunakan model Deep Learning untuk menghitung Experience Points (EXP) sebagai indikator kesehatan finansial, melakukan segmentasi pengguna ke dalam liga gamifikasi menggunakan model K-Means, serta memberikan saran finansial personal menggunakan Generative AI.
 
 Proyek ini dikembangkan sebagai Capstone Project dalam program Coding Camp by DBS Foundation.
 
@@ -9,16 +9,19 @@ Proyek ini dikembangkan sebagai Capstone Project dalam program Coding Camp by DB
 
 ## | Features
 
-### 1. Financial Health Scoring (Deep Learning)
-* Memanfaatkan model Deep Learning yang dibangun menggunakan **TensorFlow Functional API**.
-* Model dilatih menggunakan *custom training loop* (`tf.GradientTape`) dengan evaluasi metrik *Mean Absolute Error* (MAE) dan optimasi *early stopping*.
+### 1. EXP Calculation (Deep Learning)
+* Memanfaatkan model Deep Learning yang dibangun menggunakan *TensorFlow Functional API*.
+* Model memprediksi jumlah EXP (`Experience Points`) yang layak didapatkan pengguna berdasarkan perilaku pengeluaran mereka (nominal, rasio budget, frekuensi transaksi, dll).
 * Mengimplementasikan *custom layer* (`FinesseDenseLayer`) untuk pemrosesan operasi *dense* jaringan saraf secara manual.
 
-### 2. AI Financial Advisor (Generative AI)
-* Mengintegrasikan API **Google Gemini** (`gemini-2.5-flash`) untuk memberikan evaluasi naratif berbasis teks.
-* Mensintesis hasil analitik skor Deep Learning dan data pengeluaran (anggaran bulanan, total pengeluaran, nominal transaksi) menjadi saran keuangan personal.
+### 2. Gamification & League Profiling (K-Means)
+* Melakukan segmentasi pengguna ke dalam 4 liga (Gold, Silver, Bronze, Iron) berdasarkan pola pengeluaran dan utilitas anggaran menggunakan model *K-Means Clustering*.
 
-### 3. RESTful API
+### 3. AI Financial Advisor (Generative AI)
+* Mengintegrasikan API **Google Gemini** (`gemini-2.5-flash`) untuk memberikan evaluasi naratif berbasis teks.
+* Mensintesis hasil perolehan EXP, data pengeluaran, dan status liga menjadi saran keuangan personal yang memotivasi pengguna.
+
+### 4. RESTful API
 * Berjalan di atas framework **FastAPI** untuk menyediakan antarmuka (endpoint) yang asinkron dan efisien.
 * Terdokumentasi secara otomatis melalui **Swagger UI** guna memastikan kelancaran integrasi antara model AI dan *frontend* aplikasi.
 
@@ -44,8 +47,11 @@ Proyek ini dikembangkan sebagai Capstone Project dalam program Coding Camp by DB
 ├── dataset/                
 ├── logs/                   
 ├── notebooks/              
-├── saved_models/           
-├── src/                    
+├── saved_models/
+│   ├── Deep_Learning/      
+│   └── Machine_Learning/
+├── src/           
+├── tests/           
 ├── .env                    
 ├── .gitignore              
 ├── main.py                 
