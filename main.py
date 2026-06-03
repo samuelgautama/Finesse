@@ -67,9 +67,9 @@ except NameError:
 try:
     print("\nSearching for and loading DL model and preprocessor...")
     
-    model_path = PROJECT_ROOT / 'Deep_Learning' / 'saved_models' / 'finesse_dnn_v1.keras'
-    prep_path = PROJECT_ROOT / 'Deep_Learning' / 'saved_models' / 'preprocessor_dnn.pkl'
-    scaler_path = PROJECT_ROOT / 'Deep_Learning' / 'saved_models' / 'target_scaler.pkl'
+    model_path = PROJECT_ROOT / 'saved_models' / 'Deep_Learning' / 'finesse_dnn_v1.keras'
+    prep_path = PROJECT_ROOT / 'saved_models' / 'Deep_Learning' /  'preprocessor_dnn.pkl'
+    scaler_path = PROJECT_ROOT / 'saved_models' / 'Deep_Learning' / 'target_scaler.pkl'
     
     model = tf.keras.models.load_model(
         model_path, 
