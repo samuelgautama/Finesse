@@ -189,7 +189,7 @@ async def analyze_dashboard(request: UnifiedRequest):
         # KONVERSI KE EXP: Membulatkan hasil ke bilangan bulat murni (Integer)
         exp_earned = int(round(float(true_prediction[0][0]), 0))
 
-        # --- C. GENERATIVE AI PHASE ---
+        # --- C. GENERATIVE AI PHASE (Khusus Misi Personal) ---
         kategori_aktif = "Lainnya"
         for key, value in features_dict.items():
             if key.startswith("category_") and value == 1:
@@ -198,23 +198,22 @@ async def analyze_dashboard(request: UnifiedRequest):
                 
         status_weekend = "Ya" if features_dict.get('is_weekend', 0) == 1 else "Tidak"
         status_akhir_bulan = "Ya" if features_dict.get('is_month_end', 0) == 1 else "Tidak"
+        sisa_anggaran = monthly_budget - features_dict.get('cumulative_spend', 0)
 
-        # PROMPT TERBARU SESUAI KONSEP EXP
         prompt = f"""
-        Kamu adalah Finesse, penasihat keuangan pribadi AI yang ramah dan memotivasi. 
-        Data pengguna saat ini:
-        - Kategori Transaksi Terakhir: {kategori_aktif}
-        - Nominal Transaksi: Rp {features_dict.get('amount', 0)}
-        - Rata-rata Biasa: Rp {features_dict.get('user_avg_transaction', 0)}
-        - Anggaran Bulanan: Rp {monthly_budget}
+        Kamu adalah sistem AI gamifikasi untuk aplikasi keuangan Finesse.
+        
+        Data transaksi pengguna saat ini:
+        - Kategori Transaksi: {kategori_aktif}
+        - Nominal: Rp {features_dict.get('amount', 0)}
+        - Sisa Anggaran Bulanan: Rp {sisa_anggaran}
+        - Liga Gamifikasi Saat Ini: {user_league}
         - Konteks: Akhir Pekan? {status_weekend} | Akhir Bulan? {status_akhir_bulan}
         
-        Analisis Sistem Internal Finesse:
-        - EXP yang Didapat dari Transaksi Ini: +{exp_earned} EXP
-        - Liga Saat Ini: {user_league}
-        - Misi Aktif: "{user_mission}"
+        TUGASMU:
+        Buat 1 kalimat tantangan/misi spesifik (maksimal 15 kata) untuk beberapa hari ke depan berdasarkan pengeluaran terakhir ini, agar pengguna tetap hemat dan bertahan di Liga {user_league}. Gaya bahasa santai anak muda.
         
-        Berikan saran (maksimal 5 kalimat) yang menyoroti perolehan EXP mereka, mengomentari transaksi terakhir berdasarkan konteks (kategori/waktu), dan SEMANGATI mereka untuk terus menyelesaikan Misi Aktif di Liga {user_league}. Gaya bahasa kasual anak muda.
+        KEMBALIKAN HANYA KALIMAT MISINYA SAJA TANPA EMBEL-EMBEL APAPUN.
         """
         
         try:
@@ -222,9 +221,13 @@ async def analyze_dashboard(request: UnifiedRequest):
                 model='gemini-2.5-flash',
                 contents=prompt
             )
-            ai_advice = response.text
-        except Exception:
-            ai_advice = f"Selamat, kamu dapat +{exp_earned} EXP! Terus berjuang selesaikan misimu di Liga {user_league} ya!"
+            # Mengambil teks murni dari Gemini sebagai Misi
+            dynamic_mission = response.text.strip()
+            
+        except Exception as e_genai:
+            print(f"Error GenAI: {e_genai}")
+            # Fallback ke misi bawaan K-Means jika Gemini sedang gangguan
+            dynamic_mission = user_mission 
 
         # --- D. RETURN RESPONSE ---
         return {
@@ -234,12 +237,13 @@ async def analyze_dashboard(request: UnifiedRequest):
                 "exp_earned": exp_earned,
                 "gamification": {
                     "league": user_league,
-                    "mission": user_mission,
+                    "mission": dynamic_mission, 
                     "budget_utilization_percentage": round(budget_utilization * 100, 1)
-                },
-                "ai_advisor_message": ai_advice
+                }
+                # "ai_advisor_message" DIHAPUS sesuai permintaan Rayza
             }
         }
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
