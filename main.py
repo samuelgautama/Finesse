@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 import joblib
+import json
 from pathlib import Path
 
 # Suppress TensorFlow logging for a cleaner terminal output
@@ -189,7 +190,9 @@ async def analyze_dashboard(request: UnifiedRequest):
         # KONVERSI KE EXP: Membulatkan hasil ke bilangan bulat murni (Integer)
         exp_earned = int(round(float(true_prediction[0][0]), 0))
 
-        # --- C. GENERATIVE AI PHASE (Khusus Misi Personal) ---
+# --- C. GENERATIVE AI PHASE (Dynamic Mission Generator) ---
+        import json 
+        
         kategori_aktif = "Lainnya"
         for key, value in features_dict.items():
             if key.startswith("category_") and value == 1:
@@ -200,20 +203,49 @@ async def analyze_dashboard(request: UnifiedRequest):
         status_akhir_bulan = "Ya" if features_dict.get('is_month_end', 0) == 1 else "Tidak"
         sisa_anggaran = monthly_budget - features_dict.get('cumulative_spend', 0)
 
+        # Prompt khusus untuk menghasilkan 3 Misi tanpa basa-basi pujian
         prompt = f"""
-        Kamu adalah sistem AI gamifikasi untuk aplikasi keuangan Finesse.
+        Kamu adalah sistem pembuat misi gamifikasi (Quest Generator) untuk aplikasi Finesse.
         
         Data transaksi pengguna saat ini:
         - Kategori Transaksi: {kategori_aktif}
-        - Nominal: Rp {features_dict.get('amount', 0)}
+        - Nominal Transaksi: Rp {features_dict.get('amount', 0)}
         - Sisa Anggaran Bulanan: Rp {sisa_anggaran}
-        - Liga Gamifikasi Saat Ini: {user_league}
         - Konteks: Akhir Pekan? {status_weekend} | Akhir Bulan? {status_akhir_bulan}
         
-        TUGASMU:
-        Buat 1 kalimat tantangan/misi spesifik (maksimal 15 kata) untuk beberapa hari ke depan berdasarkan pengeluaran terakhir ini, agar pengguna tetap hemat dan bertahan di Liga {user_league}. Gaya bahasa santai anak muda.
+        Status Profil:
+        - Financial Score / Base EXP: {exp_earned}
+        - Liga Gamifikasi: {user_league}
         
-        KEMBALIKAN HANYA KALIMAT MISINYA SAJA TANPA EMBEL-EMBEL APAPUN.
+        TUGAS UTAMA:
+        Hasilkan tepat 3 misi (tantangan keuangan) spesifik untuk beberapa hari ke depan agar pengguna bisa bertahan atau naik dari Liga {user_league}. 
+        Misi harus realistis dan relevan dengan "Kategori Transaksi" atau "Sisa Anggaran" di atas.
+        
+        Aturan Reward EXP berdasarkan kesulitan:
+        - Mudah: 10 - 20 EXP
+        - Sedang: 25 - 40 EXP
+        - Sulit: 50 - 100 EXP
+        
+        Balas HANYA dengan format JSON murni persis seperti di bawah ini, tanpa teks pengantar, tanpa tag markdown:
+        {{
+          "misi": [
+            {{
+              "kesulitan": "Mudah",
+              "deskripsi": "Tuliskan tantangan ringan di sini...",
+              "exp_reward": 15
+            }},
+            {{
+              "kesulitan": "Sedang",
+              "deskripsi": "Tuliskan tantangan menengah di sini...",
+              "exp_reward": 30
+            }},
+            {{
+              "kesulitan": "Sulit",
+              "deskripsi": "Tuliskan tantangan berat di sini...",
+              "exp_reward": 75
+            }}
+          ]
+        }}
         """
         
         try:
@@ -221,13 +253,22 @@ async def analyze_dashboard(request: UnifiedRequest):
                 model='gemini-2.5-flash',
                 contents=prompt
             )
-            # Mengambil teks murni dari Gemini sebagai Misi
-            dynamic_mission = response.text.strip()
+            
+            # Membersihkan teks dari markdown agar parsing JSON aman
+            clean_response = response.text.replace("```json", "").replace("```", "").strip()
+            ai_data = json.loads(clean_response)
+            
+            # Mengambil array misi dari JSON
+            daftar_misi = ai_data.get("misi", [])
             
         except Exception as e_genai:
-            print(f"Error GenAI: {e_genai}")
-            # Fallback ke misi bawaan K-Means jika Gemini sedang gangguan
-            dynamic_mission = user_mission 
+            print(f"Error GenAI Mission Generator: {e_genai}")
+            # Fallback jika API Gemini sibuk/error agar aplikasi tidak crash
+            daftar_misi = [
+                {"kesulitan": "Mudah", "deskripsi": "Catat pengeluaranmu lagi besok hari.", "exp_reward": 10},
+                {"kesulitan": "Sedang", "deskripsi": f"Tahan pengeluaran untuk {kategori_aktif} selama 3 hari ke depan.", "exp_reward": 30},
+                {"kesulitan": "Sulit", "deskripsi": f"Pertahankan sisa anggaran Rp {sisa_anggaran} hingga akhir bulan ini.", "exp_reward": 50}
+            ]
 
         # --- D. RETURN RESPONSE ---
         return {
@@ -237,10 +278,9 @@ async def analyze_dashboard(request: UnifiedRequest):
                 "exp_earned": exp_earned,
                 "gamification": {
                     "league": user_league,
-                    "mission": dynamic_mission, 
                     "budget_utilization_percentage": round(budget_utilization * 100, 1)
-                }
-                # "ai_advisor_message" DIHAPUS sesuai permintaan Rayza
+                },
+                "dynamic_missions": daftar_misi
             }
         }
         
