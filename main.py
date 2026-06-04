@@ -30,7 +30,6 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 # %% 2. Redefine Custom Layer for Model Loading
 class FinesseDenseLayer(tf.keras.layers.Layer):
-    """Implementing standard dense layer (W * x + b) manually."""
     def __init__(self, units=32, activation='relu', **kwargs):
         super(FinesseDenseLayer, self).__init__(**kwargs)
         self.units = units
@@ -51,20 +50,18 @@ class FinesseDenseLayer(tf.keras.layers.Layer):
 
 # %% 3. App Initialization & Model Loading
 app = FastAPI(
-    title="Finesse AI API",
-    description="Unified API for Gamified EXP Prediction (DNN), League Profiling (K-Means), and Context-Aware AI Advisor.",
-    version="2.5.0" 
+    title="Finesse Modular API",
+    description="Microservices API untuk Deep Learning (EXP), Machine Learning (League), dan GenAI (Missions).",
+    version="3.0.0" 
 )
 
 # Global Variables
 model_dnn = None
 preprocessor_dnn = None
 target_scaler = None
-
 scaler_km = None
 kmeans_model = None
 league_mapping = {}
-missions_mapping = {}
 
 try:
     PROJECT_ROOT = Path(__file__).resolve().parent
@@ -72,7 +69,7 @@ except NameError:
     PROJECT_ROOT = Path.cwd()
 
 try:
-    print("\n⏳ Memuat seluruh arsitektur Machine Learning & Deep Learning...")
+    print("\nMemuat seluruh arsitektur AI...")
     
     # DL Paths
     dnn_dir = PROJECT_ROOT / 'saved_models' / 'Deep_Learning'
@@ -90,15 +87,13 @@ try:
     mappings = joblib.load(km_dir / 'league_mapping.pkl')
     
     league_mapping = mappings['leagues']
-    missions_mapping = mappings['missions']
     
-    print("✅ Seluruh model (DNN & K-Means) siap melayani request!\n")
+    print("Seluruh model siap melayani request!\n")
 except Exception as e:
-    print(f"\n❌ GAGAL MEMUAT MODEL: {e}")
+    print(f"\nGAGAL MEMUAT MODEL: {e}")
 
 # %% 4. Input Schemas (Validasi Data & Template Swagger)
-class UnifiedRequest(BaseModel):
-    """Skema utama yang menggabungkan seluruh fitur yang dibutuhkan DNN dan K-Means"""
+class ExpRequest(BaseModel):
     features: Dict[str, Any]
 
     class Config:
@@ -127,8 +122,7 @@ class UnifiedRequest(BaseModel):
             }
         }
 
-class GamificationOnlyRequest(BaseModel):
-    """Skema ringan khusus untuk update leaderboard"""
+class LeagueRequest(BaseModel):
     total_spent: float
     transaction_count: int
     monthly_budget: float
@@ -142,40 +136,28 @@ class GamificationOnlyRequest(BaseModel):
             }
         }
 
-# %% 5. ENDPOINT UTAMA: Dashboard Analysis (All-in-One)
-@app.post("/dashboard-analyze")
-async def analyze_dashboard(request: UnifiedRequest):
-    if any(m is None for m in [model_dnn, preprocessor_dnn, target_scaler, scaler_km, kmeans_model]):
-        raise HTTPException(status_code=500, detail="Sistem AI belum siap.")
+class MissionRequest(BaseModel):
+    kategori_aktif: str
+    amount: float
+    sisa_anggaran: float
+    is_weekend: int
+    is_month_end: int
+    exp_earned: int
+    user_league: str
+
+# %% 5. ENDPOINT 1: Calculate EXP (Deep Learning Khusus CRUD)
+@app.post("/calculate-exp")
+async def calculate_exp(request: ExpRequest):
+    """
+    Dipanggil saat user menyimpan transaksi baru. Hanya menjalankan Deep Learning.
+    """
+    if any(m is None for m in [model_dnn, preprocessor_dnn, target_scaler]):
+        raise HTTPException(status_code=500, detail="Model DL belum siap.")
 
     try:
         features_dict = request.features
-        
-        # --- A. GAMIFICATION PHASE (K-Means League Placement) ---
-        total_spent = features_dict.get('cumulative_spend', 0)
-        trx_count = features_dict.get('transaction_count', 1) 
-        monthly_budget = features_dict.get('monthly_budget', 1) 
-        
-        # Proteksi: Mencegah pembagian dengan nol
-        if monthly_budget <= 0:
-            monthly_budget = 1 
-            
-        budget_utilization = total_spent / monthly_budget
-        
-        km_features = pd.DataFrame({
-            'total_spent': [total_spent],
-            'transaction_count': [trx_count],
-            'budget_utilization': [budget_utilization]
-        })
-        
-        km_scaled = scaler_km.transform(km_features)
-        cluster_id = kmeans_model.predict(km_scaled)[0]
-        
-        user_league = league_mapping.get(cluster_id, "Unranked")
-        user_mission = missions_mapping.get(cluster_id, "Catat transaksimu dengan baik!")
-
-        # --- B. DEEP LEARNING PHASE (DNN EXP Prediction) ---
         df_input_dnn = pd.DataFrame([features_dict])
+        
         for col in df_input_dnn.columns:
             if df_input_dnn[col].dtype == 'bool':
                 df_input_dnn[col] = df_input_dnn[col].astype(int)
@@ -187,39 +169,73 @@ async def analyze_dashboard(request: UnifiedRequest):
         scaled_prediction = model_dnn.predict(X_processed, verbose=0)
         true_prediction = target_scaler.inverse_transform(scaled_prediction)
         
-        # KONVERSI KE EXP: Membulatkan hasil ke bilangan bulat murni (Integer)
         exp_earned = int(round(float(true_prediction[0][0]), 0))
 
-# --- C. GENERATIVE AI PHASE (Dynamic Mission Generator) ---
-        import json 
-        
-        kategori_aktif = "Lainnya"
-        for key, value in features_dict.items():
-            if key.startswith("category_") and value == 1:
-                kategori_aktif = key.replace("category_", "")
-                break
-                
-        status_weekend = "Ya" if features_dict.get('is_weekend', 0) == 1 else "Tidak"
-        status_akhir_bulan = "Ya" if features_dict.get('is_month_end', 0) == 1 else "Tidak"
-        sisa_anggaran = monthly_budget - features_dict.get('cumulative_spend', 0)
+        return {
+            "status": "success",
+            "data": {
+                "exp_earned": exp_earned
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-        # Prompt khusus untuk menghasilkan 3 Misi tanpa basa-basi pujian
+# %% 6. ENDPOINT 2: Get League (K-Means Khusus Leaderboard)
+@app.post("/get-league")
+async def get_league(request: LeagueRequest):
+    """
+    Dipanggil untuk mengupdate status ranking/liga user.
+    """
+    if any(m is None for m in [scaler_km, kmeans_model]):
+        raise HTTPException(status_code=500, detail="Model ML belum siap.")
+
+    try:
+        monthly_budget = request.monthly_budget if request.monthly_budget > 0 else 1
+        budget_utilization = request.total_spent / monthly_budget
+        
+        km_features = pd.DataFrame({
+            'total_spent': [request.total_spent],
+            'transaction_count': [request.transaction_count],
+            'budget_utilization': [budget_utilization]
+        })
+        
+        km_scaled = scaler_km.transform(km_features)
+        cluster_id = kmeans_model.predict(km_scaled)[0]
+        
+        return {
+            "status": "success",
+            "data": {
+                "league": league_mapping.get(cluster_id, "Unranked"),
+                "budget_utilization_percentage": round(budget_utilization * 100, 1)
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# %% 7. ENDPOINT 3: Generate Missions (GenAI Khusus Tombol Misi)
+@app.post("/generate-missions")
+async def generate_missions(request: MissionRequest):
+    """
+    Dipanggil HANYA KETIKA user menekan tombol 'Generate Misi' di web.
+    """
+    try:
+        status_weekend = "Ya" if request.is_weekend == 1 else "Tidak"
+        status_akhir_bulan = "Ya" if request.is_month_end == 1 else "Tidak"
+
         prompt = f"""
         Kamu adalah sistem pembuat misi gamifikasi (Quest Generator) untuk aplikasi Finesse.
         
-        Data transaksi pengguna saat ini:
-        - Kategori Transaksi: {kategori_aktif}
-        - Nominal Transaksi: Rp {features_dict.get('amount', 0)}
-        - Sisa Anggaran Bulanan: Rp {sisa_anggaran}
+        Data pengguna saat ini:
+        - Kategori Transaksi Terakhir: {request.kategori_aktif}
+        - Nominal Transaksi Terakhir: Rp {request.amount}
+        - Sisa Anggaran Bulanan: Rp {request.sisa_anggaran}
         - Konteks: Akhir Pekan? {status_weekend} | Akhir Bulan? {status_akhir_bulan}
-        
-        Status Profil:
-        - Financial Score / Base EXP: {exp_earned}
-        - Liga Gamifikasi: {user_league}
+        - EXP Terakhir Didapat: +{request.exp_earned}
+        - Liga Gamifikasi: {request.user_league}
         
         TUGAS UTAMA:
-        Hasilkan tepat 3 misi (tantangan keuangan) spesifik untuk beberapa hari ke depan agar pengguna bisa bertahan atau naik dari Liga {user_league}. 
-        Misi harus realistis dan relevan dengan "Kategori Transaksi" atau "Sisa Anggaran" di atas.
+        Hasilkan tepat 3 misi (tantangan keuangan) spesifik untuk beberapa hari ke depan agar pengguna bisa bertahan atau naik dari Liga {request.user_league}. 
+        Misi harus realistis. Sangat disarankan agar salah satu misi mendorong pengguna untuk menarik dan menyimpan sebagian sisa uang mereka dalam bentuk cash (tunai) fisik untuk mencegah pengeluaran impulsif elektronik.
         
         Aturan Reward EXP berdasarkan kesulitan:
         - Mudah: 10 - 20 EXP
@@ -248,83 +264,38 @@ async def analyze_dashboard(request: UnifiedRequest):
         }}
         """
         
-        try:
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt
-            )
-            
-            # Membersihkan teks dari markdown agar parsing JSON aman
-            clean_response = response.text.replace("```json", "").replace("```", "").strip()
-            ai_data = json.loads(clean_response)
-            
-            # Mengambil array misi dari JSON
-            daftar_misi = ai_data.get("misi", [])
-            
-        except Exception as e_genai:
-            print(f"Error GenAI Mission Generator: {e_genai}")
-            # Fallback jika API Gemini sibuk/error agar aplikasi tidak crash
-            daftar_misi = [
-                {"kesulitan": "Mudah", "deskripsi": "Catat pengeluaranmu lagi besok hari.", "exp_reward": 10},
-                {"kesulitan": "Sedang", "deskripsi": f"Tahan pengeluaran untuk {kategori_aktif} selama 3 hari ke depan.", "exp_reward": 30},
-                {"kesulitan": "Sulit", "deskripsi": f"Pertahankan sisa anggaran Rp {sisa_anggaran} hingga akhir bulan ini.", "exp_reward": 50}
-            ]
-
-        # --- D. RETURN RESPONSE ---
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
+        
+        clean_response = response.text.replace("```json", "").replace("```", "").strip()
+        ai_data = json.loads(clean_response)
+        daftar_misi = ai_data.get("misi", [])
+        
         return {
             "status": "success",
-            "endpoint": "dashboard-analyze",
             "data": {
-                "exp_earned": exp_earned,
-                "gamification": {
-                    "league": user_league,
-                    "budget_utilization_percentage": round(budget_utilization * 100, 1)
-                },
                 "dynamic_missions": daftar_misi
             }
         }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# %% 6. ENDPOINT SEKUNDER: Gamification Only
-@app.post("/gamification-only")
-async def analyze_gamification(request: GamificationOnlyRequest):
-    if any(m is None for m in [scaler_km, kmeans_model]):
-        raise HTTPException(status_code=500, detail="Model Gamifikasi belum dimuat.")
-
-    try:
-        if request.monthly_budget <= 0:
-            raise HTTPException(status_code=400, detail="monthly_budget tidak boleh 0 atau minus.")
-            
-        budget_utilization = request.total_spent / request.monthly_budget
-        km_features = pd.DataFrame({
-            'total_spent': [request.total_spent],
-            'transaction_count': [request.transaction_count],
-            'budget_utilization': [budget_utilization]
-        })
-        
-        km_scaled = scaler_km.transform(km_features)
-        cluster_id = kmeans_model.predict(km_scaled)[0]
-        
+    except Exception as e_genai:
+        # Fallback jika terjadi error pada API Gemini
         return {
-            "status": "success",
-            "endpoint": "gamification-only",
+            "status": "partial_success",
             "data": {
-                "league": league_mapping.get(cluster_id, "Unranked"),
-                "mission": missions_mapping.get(cluster_id, "Catat transaksimu!"),
-                "budget_utilization_percentage": round(budget_utilization * 100, 1)
+                "dynamic_missions": [
+                    {"kesulitan": "Mudah", "deskripsi": "Catat pengeluaranmu lagi besok hari.", "exp_reward": 10},
+                    {"kesulitan": "Sedang", "deskripsi": f"Tahan pengeluaran untuk {request.kategori_aktif} selama 3 hari.", "exp_reward": 30},
+                    {"kesulitan": "Sulit", "deskripsi": f"Amankan sisa Rp {request.sisa_anggaran} dalam bentuk uang cash fisik agar tidak impulsif belanja.", "exp_reward": 50}
+                ]
             }
         }
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
-# %% 7. Health Check
+# %% 8. Health Check
 @app.get("/test")
 async def test_endpoint():
-    return {"message": "API Server Berjalan Normal!"}
+    return {"message": "Modular API Server Berjalan Normal!"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
