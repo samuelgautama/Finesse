@@ -237,28 +237,28 @@ async def generate_missions(request: MissionRequest):
         Hasilkan tepat 3 misi (tantangan keuangan) spesifik untuk beberapa hari ke depan agar pengguna bisa bertahan atau naik dari Liga {request.user_league}. 
         Misi harus realistis. Sangat disarankan agar salah satu misi mendorong pengguna untuk menarik dan menyimpan sebagian sisa uang mereka dalam bentuk cash (tunai) fisik untuk mencegah pengeluaran impulsif elektronik.
         
-        Aturan Reward EXP berdasarkan kesulitan:
-        - Mudah: 10 - 20 EXP
-        - Sedang: 25 - 40 EXP
-        - Sulit: 50 - 100 EXP
+        Aturan Reward EXP (WAJIB PILIH ANGKA ACAK DALAM RENTANG INI):
+        - Mudah: 100 - 150 EXP
+        - Sedang: 151 - 250 EXP
+        - Sulit: 251 - 400 EXP
         
-        Balas HANYA dengan format JSON murni persis seperti di bawah ini, tanpa teks pengantar, tanpa tag markdown:
+        Balas HANYA dengan format JSON murni persis seperti di bawah ini, tanpa teks pengantar, tanpa tag markdown. Untuk exp_reward, gantilah dengan angka yang sesuai rentang di atas:
         {{
           "misi": [
             {{
               "kesulitan": "Mudah",
               "deskripsi": "Tuliskan tantangan ringan di sini...",
-              "exp_reward": 15
+              "exp_reward": 125
             }},
             {{
               "kesulitan": "Sedang",
               "deskripsi": "Tuliskan tantangan menengah di sini...",
-              "exp_reward": 30
+              "exp_reward": 200
             }},
             {{
               "kesulitan": "Sulit",
               "deskripsi": "Tuliskan tantangan berat di sini...",
-              "exp_reward": 75
+              "exp_reward": 350
             }}
           ]
         }}
@@ -269,6 +269,7 @@ async def generate_missions(request: MissionRequest):
             contents=prompt
         )
         
+        # Membersihkan markdown jika Gemini menambahkannya
         clean_response = response.text.replace("```json", "").replace("```", "").strip()
         ai_data = json.loads(clean_response)
         daftar_misi = ai_data.get("misi", [])
@@ -280,14 +281,15 @@ async def generate_missions(request: MissionRequest):
             }
         }
     except Exception as e_genai:
-        # Fallback jika terjadi error pada API Gemini
+        print(f"Error GenAI Mission Generator: {e_genai}")
+        # Fallback jika terjadi error pada API Gemini (Angka EXP sudah disesuaikan dengan rentang baru)
         return {
             "status": "partial_success",
             "data": {
                 "dynamic_missions": [
-                    {"kesulitan": "Mudah", "deskripsi": "Catat pengeluaranmu lagi besok hari.", "exp_reward": 10},
-                    {"kesulitan": "Sedang", "deskripsi": f"Tahan pengeluaran untuk {request.kategori_aktif} selama 3 hari.", "exp_reward": 30},
-                    {"kesulitan": "Sulit", "deskripsi": f"Amankan sisa Rp {request.sisa_anggaran} dalam bentuk uang cash fisik agar tidak impulsif belanja.", "exp_reward": 50}
+                    {"kesulitan": "Mudah", "deskripsi": "Catat pengeluaranmu lagi besok hari.", "exp_reward": 120},
+                    {"kesulitan": "Sedang", "deskripsi": f"Tahan pengeluaran untuk {request.kategori_aktif} selama 3 hari.", "exp_reward": 200},
+                    {"kesulitan": "Sulit", "deskripsi": f"Amankan sisa Rp {request.sisa_anggaran} dalam bentuk uang cash fisik agar tidak impulsif belanja.", "exp_reward": 350}
                 ]
             }
         }
