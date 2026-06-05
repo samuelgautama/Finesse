@@ -234,30 +234,33 @@ async def generate_missions(request: MissionRequest):
         - Liga Gamifikasi: {request.user_league}
         
         TUGAS UTAMA:
-        Hasilkan tepat 3 misi (tantangan keuangan) spesifik untuk beberapa hari ke depan agar pengguna bisa bertahan atau naik dari Liga {request.user_league}. 
-        Misi harus realistis. Sangat disarankan agar salah satu misi mendorong pengguna untuk menarik dan menyimpan sebagian sisa uang mereka dalam bentuk cash (tunai) fisik untuk mencegah pengeluaran impulsif elektronik.
+        Hasilkan tepat 3 misi (tantangan keuangan) spesifik yang DAPAT DISELESAIKAN DALAM WAKTU 1 HARI (24 Jam) agar pengguna bisa bertahan atau naik dari Liga {request.user_league}. 
+        Misi harus realistis. Sangat disarankan agar salah satu misi mendorong pengguna untuk menarik uang cash (tunai) hari ini juga untuk menyimpan sisa uang agar tidak terjadi pengeluaran impulsif secara elektronik.
         
         Aturan Reward EXP (WAJIB PILIH ANGKA ACAK DALAM RENTANG INI):
         - Mudah: 100 - 150 EXP
         - Sedang: 151 - 250 EXP
         - Sulit: 251 - 400 EXP
         
-        Balas HANYA dengan format JSON murni persis seperti di bawah ini, tanpa teks pengantar, tanpa tag markdown. Untuk exp_reward, gantilah dengan angka yang sesuai rentang di atas:
+        Balas HANYA dengan format JSON murni persis seperti di bawah ini, tanpa teks pengantar, tanpa tag markdown. Buatlah judul yang *catchy* bergaya anak muda, dan untuk exp_reward, gantilah dengan angka acak yang sesuai rentang di atas:
         {{
           "misi": [
             {{
+              "judul": "Tulis Judul Misi Singkat Di Sini",
               "kesulitan": "Mudah",
-              "deskripsi": "Tuliskan tantangan ringan di sini...",
+              "deskripsi": "Tuliskan tantangan ringan 1 hari di sini...",
               "exp_reward": 125
             }},
             {{
+              "judul": "Tulis Judul Misi Singkat Di Sini",
               "kesulitan": "Sedang",
-              "deskripsi": "Tuliskan tantangan menengah di sini...",
+              "deskripsi": "Tuliskan tantangan menengah 1 hari di sini...",
               "exp_reward": 200
             }},
             {{
+              "judul": "Tulis Judul Misi Singkat Di Sini",
               "kesulitan": "Sulit",
-              "deskripsi": "Tuliskan tantangan berat di sini...",
+              "deskripsi": "Tuliskan tantangan berat 1 hari di sini...",
               "exp_reward": 350
             }}
           ]
@@ -269,7 +272,6 @@ async def generate_missions(request: MissionRequest):
             contents=prompt
         )
         
-        # Membersihkan markdown jika Gemini menambahkannya
         clean_response = response.text.replace("```json", "").replace("```", "").strip()
         ai_data = json.loads(clean_response)
         daftar_misi = ai_data.get("misi", [])
@@ -282,14 +284,29 @@ async def generate_missions(request: MissionRequest):
         }
     except Exception as e_genai:
         print(f"Error GenAI Mission Generator: {e_genai}")
-        # Fallback jika terjadi error pada API Gemini (Angka EXP sudah disesuaikan dengan rentang baru)
+        # Fallback jika terjadi error pada API Gemini (Ditambahkan Judul agar JSON tetap valid)
         return {
             "status": "partial_success",
             "data": {
                 "dynamic_missions": [
-                    {"kesulitan": "Mudah", "deskripsi": "Catat pengeluaranmu lagi besok hari.", "exp_reward": 120},
-                    {"kesulitan": "Sedang", "deskripsi": f"Tahan pengeluaran untuk {request.kategori_aktif} selama 3 hari.", "exp_reward": 200},
-                    {"kesulitan": "Sulit", "deskripsi": f"Amankan sisa Rp {request.sisa_anggaran} dalam bentuk uang cash fisik agar tidak impulsif belanja.", "exp_reward": 350}
+                    {
+                        "judul": "Disiplin Hari Ini",
+                        "kesulitan": "Mudah", 
+                        "deskripsi": "Pastikan kamu mencatat setiap sen pengeluaranmu hari ini tanpa ada yang terlewat.", 
+                        "exp_reward": 120
+                    },
+                    {
+                        "judul": "Puasa Kategori",
+                        "kesulitan": "Sedang", 
+                        "deskripsi": f"Tahan diri 100% dari pengeluaran untuk {request.kategori_aktif} hari ini.", 
+                        "exp_reward": 200
+                    },
+                    {
+                        "judul": "Amankan Cash Fisik",
+                        "kesulitan": "Sulit", 
+                        "deskripsi": f"Pergi ke ATM hari ini, tarik tunai sisa Rp {request.sisa_anggaran} agar aman dari godaan jajan elektronik.", 
+                        "exp_reward": 350
+                    }
                 ]
             }
         }
