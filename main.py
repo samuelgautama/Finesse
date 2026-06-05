@@ -242,25 +242,31 @@ async def generate_missions(request: MissionRequest):
         - Sedang: 151 - 250 EXP
         - Sulit: 251 - 400 EXP
         
-        Balas HANYA dengan format JSON murni persis seperti di bawah ini, tanpa teks pengantar, tanpa tag markdown. Buatlah judul yang *catchy* bergaya anak muda, dan untuk exp_reward, gantilah dengan angka acak yang sesuai rentang di atas:
+        Balas HANYA dengan format JSON murni persis seperti di bawah ini, tanpa teks pengantar, tanpa tag markdown. Buatlah title yang catchy bergaya anak muda, dan untuk exp_reward, gantilah dengan angka acak yang sesuai rentang:
         {{
           "misi": [
             {{
-              "judul": "Tulis Judul Misi Singkat Di Sini",
-              "kesulitan": "Mudah",
-              "deskripsi": "Tuliskan tantangan ringan 1 hari di sini...",
+              "title": "Tulis Judul Misi Singkat Di Sini",
+              "description": "Tuliskan tantangan 1 hari di sini...",
+              "reason": "Jelaskan mengapa misi ini penting untuk kesehatan finansial mereka saat ini...",
+              "quest_type": "Kategori quest (misal: Hemat, Pencatatan, Tarik Tunai, Disiplin, dll)",
+              "difficulty": "Mudah",
               "exp_reward": 125
             }},
             {{
-              "judul": "Tulis Judul Misi Singkat Di Sini",
-              "kesulitan": "Sedang",
-              "deskripsi": "Tuliskan tantangan menengah 1 hari di sini...",
+              "title": "Tulis Judul Misi Singkat Di Sini",
+              "description": "Tuliskan tantangan 1 hari di sini...",
+              "reason": "Jelaskan mengapa misi ini penting untuk kesehatan finansial mereka saat ini...",
+              "quest_type": "Kategori quest",
+              "difficulty": "Sedang",
               "exp_reward": 200
             }},
             {{
-              "judul": "Tulis Judul Misi Singkat Di Sini",
-              "kesulitan": "Sulit",
-              "deskripsi": "Tuliskan tantangan berat 1 hari di sini...",
+              "title": "Tulis Judul Misi Singkat Di Sini",
+              "description": "Tuliskan tantangan 1 hari di sini...",
+              "reason": "Jelaskan mengapa misi ini penting untuk kesehatan finansial mereka saat ini...",
+              "quest_type": "Kategori quest",
+              "difficulty": "Sulit",
               "exp_reward": 350
             }}
           ]
@@ -284,27 +290,33 @@ async def generate_missions(request: MissionRequest):
         }
     except Exception as e_genai:
         print(f"Error GenAI Mission Generator: {e_genai}")
-        # Fallback jika terjadi error pada API Gemini (Ditambahkan Judul agar JSON tetap valid)
+        # Fallback yang sudah disesuaikan dengan struktur JSON baru
         return {
             "status": "partial_success",
             "data": {
                 "dynamic_missions": [
                     {
-                        "judul": "Disiplin Hari Ini",
-                        "kesulitan": "Mudah", 
-                        "deskripsi": "Pastikan kamu mencatat setiap sen pengeluaranmu hari ini tanpa ada yang terlewat.", 
+                        "title": "Disiplin Hari Ini",
+                        "description": "Pastikan kamu mencatat setiap sen pengeluaranmu hari ini tanpa ada yang terlewat.",
+                        "reason": "Mencatat transaksi harian adalah langkah awal mencegah kebocoran dana tak kasat mata.",
+                        "quest_type": "Pencatatan",
+                        "difficulty": "Mudah", 
                         "exp_reward": 120
                     },
                     {
-                        "judul": "Puasa Kategori",
-                        "kesulitan": "Sedang", 
-                        "deskripsi": f"Tahan diri 100% dari pengeluaran untuk {request.kategori_aktif} hari ini.", 
+                        "title": "Puasa Kategori",
+                        "description": f"Tahan diri 100% dari pengeluaran untuk {request.kategori_aktif} hari ini.",
+                        "reason": f"Mengerem pengeluaran di kategori yang baru saja kamu gunakan melatih kontrol diri dari sifat impulsif.",
+                        "quest_type": "Hemat",
+                        "difficulty": "Sedang", 
                         "exp_reward": 200
                     },
                     {
-                        "judul": "Amankan Cash Fisik",
-                        "kesulitan": "Sulit", 
-                        "deskripsi": f"Pergi ke ATM hari ini, tarik tunai sisa Rp {request.sisa_anggaran} agar aman dari godaan jajan elektronik.", 
+                        "title": "Amankan Cash Fisik",
+                        "description": f"Pergi ke ATM hari ini, tarik tunai sisa Rp {request.sisa_anggaran} milikmu.",
+                        "reason": "Memegang uang tunai secara fisik memberikan beban psikologis yang ampuh untuk menahan hasrat jajan online/scan QR.",
+                        "quest_type": "Tarik Tunai",
+                        "difficulty": "Sulit", 
                         "exp_reward": 350
                     }
                 ]
