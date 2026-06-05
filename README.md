@@ -19,7 +19,7 @@ Proyek ini dikembangkan sebagai Capstone Project dalam program Coding Camp by DB
 
 ### 3. Dynamic Quest Generator (Generative AI)
 * Mengintegrasikan API **Google Gemini** (`gemini-2.5-flash`) untuk menghasilkan misi atau tantangan finansial harian secara dinamis (Quest Generator).
-*AI secara cerdas menganalisis sisa anggaran, kategori transaksi terakhir, dan status liga pengguna untuk meracik 3 tingkat misi (Mudah, Sedang, Sulit) lengkap dengan judul, deskripsi, alasan edukatif, dan reward EXP yang sepadan guna mencegah pengeluaran impulsif.
+* AI secara cerdas menganalisis sisa anggaran, kategori transaksi terakhir, dan status liga pengguna untuk meracik 3 tingkat misi (Mudah, Sedang, Sulit) lengkap dengan judul, deskripsi, alasan edukatif, dan reward EXP yang sepadan guna mencegah pengeluaran impulsif.
 
 ### 4. RESTful API
 * Berjalan di atas framework **FastAPI** untuk menyediakan antarmuka (endpoint) yang asinkron dan efisien.
