@@ -1,12 +1,3 @@
----
-title: Finesse AI API
-emoji: 🚀
-colorFrom: indigo
-colorTo: red
-sdk: docker
-pinned: false
----
-
 # Finesse: Gamified Budgeting & Financial Health Scorer
 > **Backend Repository: Machine Learning & Generative AI**
 
@@ -26,9 +17,9 @@ Proyek ini dikembangkan sebagai Capstone Project dalam program Coding Camp by DB
 ### 2. Gamification & League Profiling (K-Means)
 * Melakukan segmentasi pengguna ke dalam 4 liga (Gold, Silver, Bronze, Iron) berdasarkan pola pengeluaran dan utilitas anggaran menggunakan model *K-Means Clustering*.
 
-### 3. Dynamic Quest Generator (Generative AI)
-* Mengintegrasikan API **Google Gemini** (`gemini-2.5-flash`) untuk menghasilkan misi atau tantangan finansial harian secara dinamis (Quest Generator).
-*AI secara cerdas menganalisis sisa anggaran, kategori transaksi terakhir, dan status liga pengguna untuk meracik 3 tingkat misi (Mudah, Sedang, Sulit) lengkap dengan judul, deskripsi, alasan edukatif, dan reward EXP yang sepadan guna mencegah pengeluaran impulsif.
+### 3. AI Financial Advisor (Generative AI)
+* Mengintegrasikan API **Google Gemini** (`gemini-2.5-flash`) untuk memberikan evaluasi naratif berbasis teks.
+* Mensintesis hasil perolehan EXP, data pengeluaran, dan status liga menjadi saran keuangan personal yang memotivasi pengguna.
 
 ### 4. RESTful API
 * Berjalan di atas framework **FastAPI** untuk menyediakan antarmuka (endpoint) yang asinkron dan efisien.
@@ -62,8 +53,7 @@ Proyek ini dikembangkan sebagai Capstone Project dalam program Coding Camp by DB
 ├── src/           
 ├── tests/           
 ├── .env                    
-├── .gitignore
-├── Dockerfile  
+├── .gitignore              
 ├── main.py                 
 ├── requirements.txt        
 └── README.md
@@ -105,7 +95,7 @@ uvicorn main:app --reload
 ```
 
 ### 6. Pengujian Endpoint
-Akses dokumentasi interaktif melalui browser pada alamat http://127.0.0.1:8000/docs untuk melakukan uji coba request JSON langsung ke endpoint yang tersedia, seperti /calculate-exp, /get-league, dan /generate-missions.
+Akses dokumentasi interaktif melalui browser pada alamat http://127.0.0.1:8000/docs untuk melakukan uji coba request JSON langsung ke endpoint /predict.
 
 ## | Tentang Kami
 Proyek ini dikembangkan secara kolaboratif oleh tim dari Universitas Sumatera Utara:
